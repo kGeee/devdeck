@@ -59,7 +59,7 @@ export interface ProjectView extends ProjectInfo {
  */
 export type TaskStatus = "running" | "succeeded" | "failed";
 
-export type TaskKind = "server" | "script" | "git";
+export type TaskKind = "server" | "script" | "git" | "action";
 
 export interface TaskView {
   key: string;
@@ -218,4 +218,59 @@ export interface GitHubView {
   defaultBranch: string | null;
   isPrivate: boolean;
   prs: PullRequest[];
+}
+
+/* ── Project actions ────────────────────────────────────────────────────── */
+
+/**
+ * How a single input is collected and validated.
+ *
+ * "branch" is a select whose options come from the project's own git branches,
+ * so a release action can offer the real branch list instead of a free-text box.
+ */
+export type ActionInputType = "string" | "select" | "boolean" | "branch";
+
+export interface ActionInput {
+  /** Placeholder key: an arg containing "{name}" is filled with this value. */
+  name: string;
+  label: string;
+  type: ActionInputType;
+  required: boolean;
+  placeholder: string | null;
+  /** Regex source that a "string" value must match. Anchored on both ends. */
+  pattern: string | null;
+  /** Choices for "select". Ignored for other types. */
+  options: string[];
+  defaultValue: string | null;
+  /**
+   * For "boolean": the argument contributed when the value is true. The
+   * placeholder arg is dropped entirely when false, so a flag is either present
+   * in argv or absent — never an empty string the script would misread.
+   */
+  flag: string | null;
+}
+
+/**
+ * A declared, parameterised command a project exposes to DevDeck.
+ *
+ * Declared in `devdeck.json` at the project root, or under a "devdeck" key in
+ * package.json. This exists because npm scripts cannot take arguments through
+ * the Scripts pane — a release script needing a branch and a version has no way
+ * to ask for them.
+ */
+export interface ProjectAction {
+  id: string;
+  label: string;
+  description: string | null;
+  /** Executable: a PATH binary, or a path resolved inside the project. */
+  command: string;
+  /** Argv template. "{input}" placeholders are substituted per element. */
+  args: string[];
+  inputs: ActionInput[];
+  /** Shown in a confirmation step before running. Null runs immediately. */
+  confirm: string | null;
+  /** Renders the trigger as destructive and forces a typed confirmation. */
+  danger: boolean;
+  /** Working directory, relative to the project root. */
+  cwd: string | null;
 }

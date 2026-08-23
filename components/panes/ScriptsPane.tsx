@@ -17,6 +17,7 @@ import {
 import type { ProjectView, TaskView } from "@/lib/types";
 import { taskLogStream } from "@/lib/log-store";
 import { Badge, Button, EmptyState, ErrorNote } from "../ui";
+import ActionsSection from "./ActionsSection";
 
 const POLL_MS = 1500;
 
@@ -90,10 +91,28 @@ export default function ScriptsPane({ project }: { project: ProjectView }) {
   };
 
   const entries = Object.entries(scripts);
-  const taskFor = (script: string) => tasks.find((t) => t.label === script);
+  // Scoped by kind: an action labelled the same as a script must not make the
+  // script row display the action's run.
+  const taskFor = (script: string) =>
+    tasks.find((t) => t.kind === "script" && t.label === script);
 
   return (
     <div className="grid min-h-0 gap-4 p-4 lg:grid-cols-[minmax(280px,380px)_1fr]">
+      {/* Actions and scripts share the left column: both are "things you can
+          run in this project", and both stream into the same output pane. */}
+      <div className="flex min-w-0 flex-col gap-4">
+      <ActionsSection
+        project={project}
+        tasks={tasks}
+        activeKey={activeKey}
+        onRan={(key) => {
+          setActiveKey(key);
+          void load();
+        }}
+        onSelectTask={setActiveKey}
+        onCancel={cancel}
+      />
+
       <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]">
         <div className="border-b border-[var(--color-border)] px-4 py-2.5">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
@@ -178,6 +197,7 @@ export default function ScriptsPane({ project }: { project: ProjectView }) {
           </ul>
         )}
       </section>
+      </div>
 
       <section className="flex min-h-0 flex-col rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]">
         <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2.5">
