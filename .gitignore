@@ -27,3 +27,6 @@ npm-debug.log*
 
 # typescript
 *.tsbuildinfo
+
+# production build used by `npm run pwa` (kept out of the dev .next)
+/.next-pwa/
