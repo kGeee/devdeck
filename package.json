@@ -2,12 +2,13 @@
   "name": "devdeck",
   "version": "0.1.0",
   "private": true,
-  "description": "Local dev-server control panel — monitor, start, and stop your projects",
+  "description": "Local project hub \u2014 dev servers, git, pull requests, agent runs and project design graphs",
   "scripts": {
     "dev": "next dev -H 127.0.0.1 -p 4321",
     "build": "next build",
     "start": "next start -H 127.0.0.1 -p 4321",
-    "lint": "next lint"
+    "lint": "next lint",
+    "pwa": "npm run build && npm run start"
   },
   "dependencies": {
     "lucide-react": "^0.460.0",
