@@ -11,6 +11,7 @@ import ChangesPane from "./panes/ChangesPane";
 import BranchesPane from "./panes/BranchesPane";
 import PullRequestsPane from "./panes/PullRequestsPane";
 import ScriptsPane from "./panes/ScriptsPane";
+import DesignPane from "./panes/DesignPane";
 import AgentsPane from "./agents/AgentsPane";
 import AllRunsPane from "./agents/AllRunsPane";
 import GraphPane from "./agents/GraphPane";
@@ -26,6 +27,7 @@ const TABS = [
   { id: "branches", label: "Branches" },
   { id: "prs", label: "Pull Requests" },
   { id: "scripts", label: "Scripts" },
+  { id: "design", label: "Design" },
   { id: "agents", label: "Agents" },
 ] as const;
 
@@ -324,7 +326,7 @@ export default function WorkspaceShell() {
                 scroll independently), so it opts out of the shared overflow. */}
             <main
               className={
-                tab === "agents"
+                tab === "agents" || tab === "design"
                   ? "flex min-h-0 flex-1 flex-col overflow-hidden"
                   : "scroll-thin min-h-0 flex-1 overflow-y-auto"
               }
@@ -362,6 +364,9 @@ export default function WorkspaceShell() {
               )}
               {tab === "scripts" && (
                 <ScriptsPane key={`${project.name}-scripts`} project={project} />
+              )}
+              {tab === "design" && (
+                <DesignPane key={`${project.name}-design`} project={project} />
               )}
               {tab === "agents" && (
                 <AgentsPane key={`${project.name}-agents`} project={project} />
