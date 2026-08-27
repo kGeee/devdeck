@@ -1,0 +1,101 @@
+{
+  "packVersion": 1,
+  "voice": "devdeck",
+  "repo": "kGeee/devdeck",
+  "base": "main",
+  "note": "Original DevDeck packs. Kernel loads these; do not substitute foreign system prompts.",
+  "loadOrder": [
+    "concurrency.md",
+    "memory.md",
+    "room.md",
+    "skill.md",
+    "routine.md",
+    "codepath.md",
+    "dispatch.md",
+    "coordinator.md",
+    "lanes/planner.md",
+    "lanes/executor.md",
+    "lanes/reviewer.md",
+    "lanes/merger.md",
+    "lanes/stubs.md"
+  ],
+  "lanes": [
+    {
+      "id": "coordinator",
+      "name": "Coordinator",
+      "pack": "coordinator.md",
+      "runtime": true,
+      "does": ["talk to operator", "dispatch", "post locked specs into shipping room", "status", "blocking questions"],
+      "doesNot": ["write product code", "open or merge PRs", "solo-build"]
+    },
+    {
+      "id": "planner",
+      "name": "Planner",
+      "pack": "lanes/planner.md",
+      "runtime": true,
+      "does": ["recall ledger", "write a plan"],
+      "doesNot": ["write code", "open PRs"]
+    },
+    {
+      "id": "executor",
+      "name": "Executor",
+      "pack": "lanes/executor.md",
+      "runtime": true,
+      "does": ["implement a locked plan", "new branch + PR"],
+      "doesNot": ["merge", "expand scope", "start without a locked plan"]
+    },
+    {
+      "id": "reviewer",
+      "name": "Reviewer",
+      "pack": "lanes/reviewer.md",
+      "runtime": true,
+      "does": ["read the diff", "leave a verdict"],
+      "doesNot": ["merge", "rewrite the patch"]
+    },
+    {
+      "id": "merger",
+      "name": "Merger",
+      "pack": "lanes/merger.md",
+      "runtime": true,
+      "does": ["merge after Reviewer or operator approval and green CI"],
+      "doesNot": ["merge on a failing check", "merge without a verdict"]
+    },
+    {
+      "id": "design-lead",
+      "name": "Design Lead",
+      "pack": "lanes/stubs.md",
+      "runtime": false,
+      "does": ["lock UI direction"],
+      "doesNot": ["ship code"]
+    },
+    {
+      "id": "ux",
+      "name": "UX",
+      "pack": "lanes/stubs.md",
+      "runtime": false,
+      "does": ["flows, IA, density, interaction"],
+      "doesNot": ["ship code"]
+    },
+    {
+      "id": "ui",
+      "name": "UI",
+      "pack": "lanes/stubs.md",
+      "runtime": false,
+      "does": ["type, color, spacing, motion, component polish"],
+      "doesNot": ["ship code"]
+    }
+  ],
+  "skillsGlob": "skills/**/SKILL.md",
+  "routinesDir": "routines/",
+  "persist": {
+    "rooms": ".devdeck/os/rooms/",
+    "routines": ".devdeck/os/routines/",
+    "memory": ".devdeck/os/memory/"
+  },
+  "ledger": {
+    "system": "agent-log-db",
+    "beforePlan": ["recall_relevant", "recall_recent"],
+    "afterWork": ["log_entry"]
+  },
+  "concurrency": ["run-lock", "approval-gate", "shard-writer"]
+}

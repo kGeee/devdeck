@@ -1,0 +1,43 @@
+{
+  "$id": "devdeck.routine.v1",
+  "type": "object",
+  "required": ["name", "prompt", "enabled", "trigger"],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "prompt": {
+      "type": "string",
+      "description": "Intent in prose. Not a frozen tool schema."
+    },
+    "enabled": { "type": "boolean" },
+    "expiresAt": {
+      "type": "string",
+      "description": "ISO timestamp. Kernel deletes the routine after this instant."
+    },
+    "trigger": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "schedule"],
+          "properties": {
+            "type": { "const": "cron" },
+            "schedule": { "type": "string", "description": "5-field cron, operator local zone" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "repo", "events"],
+          "properties": {
+            "type": { "const": "github" },
+            "repo": { "type": "string", "description": "owner/name, no wildcard" },
+            "events": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "pr": { "type": "integer" }
+          }
+        }
+      ]
+    }
+  }
+}
