@@ -20,53 +20,139 @@ export type RoutineValidation =
   | { ok: true }
   | { ok: false; errors: string[] };
 
-export function validateRoutine(input: unknown): RoutineValidation {
+type JsonSchema = Record<string, unknown>;
+
+/**
+ * Minimal applicator for packs/routines/_schema.json (draft-ish subset:
+ * type, required, properties, oneOf, const, items, description ignored).
+ */
+function applySchema(
+  schema: JsonSchema,
+  value: unknown,
+  pathLabel = ""
+): string[] {
   const errors: string[] = [];
-  if (!input || typeof input !== "object") {
-    return { ok: false, errors: ["routine must be an object"] };
+  const label = pathLabel || "routine";
+
+  if (schema.type === "object") {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return [`${label} must be an object`];
+    }
+    const obj = value as Record<string, unknown>;
+    const required = Array.isArray(schema.required)
+      ? (schema.required as string[])
+      : [];
+    for (const key of required) {
+      if (obj[key] === undefined) errors.push(`${label}.${key} required`);
+    }
+    const properties = (schema.properties ?? {}) as Record<string, JsonSchema>;
+    for (const [key, propSchema] of Object.entries(properties)) {
+      if (obj[key] === undefined) continue;
+      errors.push(...applySchema(propSchema, obj[key], `${label}.${key}`));
+    }
+    return errors;
   }
-  const r = input as Record<string, unknown>;
-  if (typeof r.name !== "string" || !r.name) errors.push("name required");
-  if (typeof r.prompt !== "string" || !r.prompt) errors.push("prompt required");
-  if (typeof r.enabled !== "boolean") errors.push("enabled must be boolean");
-  if (r.expiresAt !== undefined && typeof r.expiresAt !== "string") {
-    errors.push("expiresAt must be a string");
+
+  if (Array.isArray(schema.oneOf)) {
+    const branches = schema.oneOf as JsonSchema[];
+    const branchErrors = branches.map((branch) => applySchema(branch, value, label));
+    if (branchErrors.some((e) => e.length === 0)) return [];
+    return [
+      `${label} must match oneOf (${branches.length} variants failed)`,
+      ...branchErrors.flatMap((e, i) => e.map((msg) => `  [${i}] ${msg}`)),
+    ];
   }
-  if (r.id !== undefined && typeof r.id !== "string") {
-    errors.push("id must be a string");
+
+  if ("const" in schema) {
+    if (value !== schema.const) {
+      errors.push(`${label} must be ${JSON.stringify(schema.const)}`);
+    }
+    return errors;
   }
-  const triggerErrors = validateTrigger(r.trigger);
-  errors.push(...triggerErrors);
+
+  if (schema.type === "string") {
+    if (typeof value !== "string") errors.push(`${label} must be a string`);
+    return errors;
+  }
+
+  if (schema.type === "boolean") {
+    if (typeof value !== "boolean") errors.push(`${label} must be a boolean`);
+    return errors;
+  }
+
+  if (schema.type === "integer") {
+    if (typeof value !== "number" || !Number.isInteger(value)) {
+      errors.push(`${label} must be an integer`);
+    }
+    return errors;
+  }
+
+  if (schema.type === "array") {
+    if (!Array.isArray(value)) {
+      errors.push(`${label} must be an array`);
+      return errors;
+    }
+    const items = schema.items as JsonSchema | undefined;
+    if (items) {
+      value.forEach((item, i) => {
+        errors.push(...applySchema(items, item, `${label}[${i}]`));
+      });
+    }
+    return errors;
+  }
+
+  return errors;
+}
+
+/** DevDeck rules JSON Schema does not express well. */
+function applyDevDeckExtras(input: Record<string, unknown>): string[] {
+  const errors: string[] = [];
+  const trigger = input.trigger;
+  if (!trigger || typeof trigger !== "object" || Array.isArray(trigger)) {
+    return errors;
+  }
+  const t = trigger as Record<string, unknown>;
+  if (t.type === "github") {
+    if (typeof t.repo === "string" && t.repo.includes("*")) {
+      errors.push("github trigger requires concrete repo owner/name (no wildcard)");
+    }
+    if (Array.isArray(t.events)) {
+      if (t.events.length === 0) {
+        errors.push("github trigger events must be non-empty");
+      } else if (!t.events.every((e) => typeof e === "string" && e.length > 0)) {
+        errors.push("github events must be non-empty strings");
+      }
+    }
+  }
+  if (t.type === "cron" && typeof t.schedule === "string" && t.schedule.trim() === "") {
+    errors.push("cron schedule must be non-empty");
+  }
+  return errors;
+}
+
+/**
+ * Validate against packs/routines/_schema.json plus DevDeck extras.
+ * Pass the schema from `loadRoutineSchema` so the loader is not dead coverage.
+ */
+export function validateRoutine(
+  input: unknown,
+  schema: Record<string, unknown>
+): RoutineValidation {
+  const schemaErrors = applySchema(schema, input);
+  const extraErrors =
+    input && typeof input === "object" && !Array.isArray(input)
+      ? applyDevDeckExtras(input as Record<string, unknown>)
+      : [];
+  const errors = [...schemaErrors, ...extraErrors];
   return errors.length ? { ok: false, errors } : { ok: true };
 }
 
-function validateTrigger(trigger: unknown): string[] {
-  if (!trigger || typeof trigger !== "object") {
-    return ["trigger required"];
-  }
-  const t = trigger as Record<string, unknown>;
-  if (t.type === "cron") {
-    if (typeof t.schedule !== "string" || !t.schedule) {
-      return ["cron trigger requires schedule"];
-    }
-    return [];
-  }
-  if (t.type === "github") {
-    const errs: string[] = [];
-    if (typeof t.repo !== "string" || !t.repo || t.repo.includes("*")) {
-      errs.push("github trigger requires concrete repo owner/name");
-    }
-    if (!Array.isArray(t.events) || t.events.length === 0) {
-      errs.push("github trigger requires events[]");
-    } else if (!t.events.every((e) => typeof e === "string")) {
-      errs.push("github events must be strings");
-    }
-    if (t.pr !== undefined && typeof t.pr !== "number") {
-      errs.push("pr must be an integer");
-    }
-    return errs;
-  }
-  return ["trigger.type must be cron or github"];
+export async function validateRoutineFromPacks(
+  input: unknown,
+  cwd = process.cwd()
+): Promise<RoutineValidation> {
+  const schema = await loadRoutineSchema(cwd);
+  return validateRoutine(input, schema);
 }
 
 async function ensureRoutinesDir(cwd: string): Promise<string> {
@@ -83,7 +169,8 @@ export async function saveRoutine(
   input: Omit<Routine, "id"> & { id?: string },
   cwd = process.cwd()
 ): Promise<Routine> {
-  const validation = validateRoutine(input);
+  const schema = await loadRoutineSchema(cwd);
+  const validation = validateRoutine(input, schema);
   if (!validation.ok) {
     throw new Error(`invalid routine: ${validation.errors.join("; ")}`);
   }

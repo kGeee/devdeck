@@ -16,6 +16,8 @@ import {
   saveRoutine,
   handleRoutineWake,
   validateRoutine,
+  validateRoutineFromPacks,
+  loadRoutineSchema,
   loadRoutine,
 } from "../routines";
 import { writeProfile, writeProjectShard, loadMemory } from "../memory";
@@ -145,20 +147,66 @@ describe("routine save + self-delete", () => {
     await rm(cwd, { recursive: true, force: true });
   });
 
-  it("validates schema, saves, and self-deletes on terminal github event / expiresAt", async () => {
+  it("validates via _schema.json, rejects schema failures, saves, and self-deletes", async () => {
+    const schema = await loadRoutineSchema(cwd);
+    assert.equal(schema.$id, "devdeck.routine.v1");
+    assert.ok(Array.isArray(schema.required));
+
     assert.equal(
-      validateRoutine({
+      validateRoutine(
+        {
+          name: "x",
+          prompt: "y",
+          enabled: true,
+          trigger: { type: "cron", schedule: "0 9 * * 1-5" },
+        },
+        schema
+      ).ok,
+      true
+    );
+
+    const missingSchedule = validateRoutine(
+      { name: "x", prompt: "y", enabled: true, trigger: { type: "cron" } },
+      schema
+    );
+    assert.equal(missingSchedule.ok, false);
+
+    const missingRequired = await validateRoutineFromPacks(
+      { prompt: "y", enabled: true, trigger: { type: "cron", schedule: "0 9 * * 1-5" } },
+      cwd
+    );
+    assert.equal(missingRequired.ok, false);
+    if (!missingRequired.ok) {
+      assert.ok(missingRequired.errors.some((e) => e.includes("name")));
+    }
+
+    const wildcardRepo = validateRoutine(
+      {
         name: "x",
         prompt: "y",
         enabled: true,
-        trigger: { type: "cron", schedule: "0 9 * * 1-5" },
-      }).ok,
-      true
+        trigger: { type: "github", repo: "org/*", events: ["pr-merged"] },
+      },
+      schema
     );
-    assert.equal(
-      validateRoutine({ name: "x", prompt: "y", enabled: true, trigger: { type: "cron" } })
-        .ok,
-      false
+    assert.equal(wildcardRepo.ok, false);
+    if (!wildcardRepo.ok) {
+      assert.ok(wildcardRepo.errors.some((e) => e.includes("wildcard")));
+    }
+
+    await assert.rejects(
+      () =>
+        saveRoutine(
+          {
+            name: "bad",
+            prompt: "no trigger shape",
+            enabled: true,
+            // @ts-expect-error intentional schema failure
+            trigger: { type: "cron" },
+          },
+          cwd
+        ),
+      /invalid routine/
     );
 
     const r = await saveRoutine(
