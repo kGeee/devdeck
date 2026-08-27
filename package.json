@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start -H 127.0.0.1 -p 4321",
     "lint": "next lint",
+    "test": "tsx --test lib/os/__tests__/**/*.test.ts",
     "pwa": "DEVDECK_DIST_DIR=.next-pwa next build && DEVDECK_DIST_DIR=.next-pwa next start -H 127.0.0.1 -p 4321"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
     "@types/react-dom": "^19.0.0",
     "postcss": "^8.5.0",
     "tailwindcss": "^4.0.0",
+    "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }
 }
